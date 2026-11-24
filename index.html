@@ -48,7 +48,18 @@
     font: 16px/1.5 Inter, system-ui, sans-serif;
   }
   main { max-width: 1280px; margin: 0 auto; padding: 32px 16px 48px; }
-  header { margin-bottom: 28px; }
+  header { margin-bottom: 28px; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  .lang {
+    display: inline-flex; background: var(--paper); border: 1px solid var(--line);
+    border-radius: 99px; padding: 3px; box-shadow: var(--shadow);
+  }
+  .lang button {
+    font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer;
+    border: 0; background: transparent; color: var(--muted);
+    padding: 6px 14px; border-radius: 99px;
+  }
+  .lang button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+  .lang button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   h1 {
     font-family: Fraunces, Georgia, serif;
     font-weight: 700;
@@ -117,28 +128,45 @@
 <body>
 <main>
   <header>
-    <h1>Menus de la semaine</h1>
-    <p class="sub" id="range"></p>
+    <div>
+      <h1 id="title">Menus de la semaine</h1>
+      <p class="sub" id="range"></p>
+    </div>
+    <div class="lang" role="group" aria-label="Langue / Língua">
+      <button type="button" data-lang="fr" aria-pressed="true">🇫🇷 FR</button>
+      <button type="button" data-lang="pt" aria-pressed="false">🇵🇹 PT</button>
+    </div>
   </header>
   <section class="week" id="week"></section>
-  <footer>Mis à jour chaque semaine 🍲</footer>
+  <footer id="footer">Mis à jour chaque semaine 🍲</footer>
 </main>
 
 <script src="semaine.js"></script>
 <script>
   (function () {
-    const NOMS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+    const T = {
+      fr: {
+        locale: "fr-FR",
+        jours: ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"],
+        titre: "Menus de la semaine",
+        plage: (a, b, an) => "Du " + a + " au " + b + " " + an,
+        aujourdhui: "Aujourd'hui", midi: "Midi", soir: "Soir", menu: "Au menu",
+        vide: "Pas de menu prévu", pied: "Mis à jour chaque semaine 🍲",
+      },
+      pt: {
+        locale: "pt-PT",
+        jours: ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"],
+        titre: "Menus da semana",
+        plage: (a, b, an) => "De " + a + " a " + b + " de " + an,
+        aujourdhui: "Hoje", midi: "Almoço", soir: "Jantar", menu: "No menu",
+        vide: "Sem menu previsto", pied: "Atualizado todas as semanas 🍲",
+      },
+    };
+
     const data = window.SEMAINE;
     const [y, m, d] = data.debut.split("-").map(Number);
-    const lundi = new Date(y, m - 1, d);
-    const fmt = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long" });
-    const fmtShort = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" });
-
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const dimanche = new Date(y, m - 1, d + 6);
-    document.getElementById("range").textContent =
-      "Du " + fmt.format(lundi) + " au " + fmt.format(dimanche) + " " + dimanche.getFullYear();
 
     const el = (tag, cls, text) => {
       const n = document.createElement(tag);
@@ -156,39 +184,67 @@
       return box;
     };
 
-    const week = document.getElementById("week");
-    data.jours.forEach((j, i) => {
-      const date = new Date(y, m - 1, d + i);
-      const card = el("article", "day");
-      if (date.getTime() === today.getTime()) card.classList.add("today");
-      else if (date < today) card.classList.add("past");
+    function render(lang) {
+      const t = T[lang];
+      document.documentElement.lang = lang;
+      document.title = t.titre;
+      document.getElementById("title").textContent = t.titre;
+      document.getElementById("footer").textContent = t.pied;
+      document.querySelectorAll(".lang button").forEach(b =>
+        b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
 
-      const head = el("div", "day-head");
-      const left = el("div");
-      left.append(el("div", "day-name", NOMS[i]), el("div", "day-date", fmtShort.format(date)));
-      if (card.classList.contains("today")) head.append(el("span", "badge", "Aujourd'hui"));
-      head.append(left);
-      card.append(head);
+      const fmt = new Intl.DateTimeFormat(t.locale, { day: "numeric", month: "long" });
+      const fmtShort = new Intl.DateTimeFormat(t.locale, { day: "numeric", month: "short" });
+      const lundi = new Date(y, m - 1, d);
+      const dimanche = new Date(y, m - 1, d + 6);
+      document.getElementById("range").textContent =
+        t.plage(fmt.format(lundi), fmt.format(dimanche), dimanche.getFullYear());
 
-      if (j.programme && j.programme.length) {
-        const chips = el("div", "chips");
-        j.programme.forEach(p => chips.append(el("span", "chip", p)));
-        card.append(chips);
-      }
+      const week = document.getElementById("week");
+      week.replaceChildren();
+      data.jours.forEach((j, i) => {
+        const date = new Date(y, m - 1, d + i);
+        const card = el("article", "day");
+        const isToday = date.getTime() === today.getTime();
+        if (isToday) card.classList.add("today");
+        else if (date < today) card.classList.add("past");
 
-      const hasMidi = j.midi && j.midi.length;
-      const hasSoir = j.soir && j.soir.length;
-      if (hasMidi) card.append(meal("Midi", j.midi));
-      if (hasSoir) card.append(meal(hasMidi ? "Soir" : "Au menu", j.soir));
-      if (!hasMidi && !hasSoir) card.append(el("p", "empty", "Pas de menu prévu"));
+        const head = el("div", "day-head");
+        const left = el("div");
+        left.append(el("div", "day-name", t.jours[i]), el("div", "day-date", fmtShort.format(date)));
+        if (isToday) head.append(el("span", "badge", t.aujourdhui));
+        head.append(left);
+        card.append(head);
 
-      if (j.notes && j.notes.length) {
-        const notes = el("div", "notes");
-        j.notes.forEach(n => notes.append(el("p", null, n)));
-        card.append(notes);
-      }
-      week.append(card);
-    });
+        if (j.programme && j.programme.length) {
+          const chips = el("div", "chips");
+          j.programme.forEach(p => chips.append(el("span", "chip", p)));
+          card.append(chips);
+        }
+
+        const hasMidi = j.midi && j.midi.length;
+        const hasSoir = j.soir && j.soir.length;
+        if (hasMidi) card.append(meal(t.midi, j.midi));
+        if (hasSoir) card.append(meal(hasMidi ? t.soir : t.menu, j.soir));
+        if (!hasMidi && !hasSoir) card.append(el("p", "empty", t.vide));
+
+        if (j.notes && j.notes.length) {
+          const notes = el("div", "notes");
+          j.notes.forEach(n => notes.append(el("p", null, n)));
+          card.append(notes);
+        }
+        week.append(card);
+      });
+    }
+
+    let lang = "fr";
+    try { if (T[localStorage.getItem("langue")]) lang = localStorage.getItem("langue"); } catch (e) {}
+    document.querySelectorAll(".lang button").forEach(b => b.addEventListener("click", () => {
+      lang = b.dataset.lang;
+      try { localStorage.setItem("langue", lang); } catch (e) {}
+      render(lang);
+    }));
+    render(lang);
   })();
 </script>
 </body>
