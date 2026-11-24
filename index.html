@@ -175,16 +175,20 @@
       return n;
     };
 
+    // Un élément est soit "texte", soit { fr: "…", pt: "…" }
+    let lang = "fr";
+    const tr = x => (typeof x === "string" ? x : (x[lang] || x.fr || ""));
+
     const meal = (label, plats) => {
       const box = el("div", "meal");
       box.append(el("p", "meal-label", label));
       const ul = el("ul");
-      plats.forEach(p => ul.append(el("li", null, p)));
+      plats.forEach(p => ul.append(el("li", null, tr(p))));
       box.append(ul);
       return box;
     };
 
-    function render(lang) {
+    function render() {
       const t = T[lang];
       document.documentElement.lang = lang;
       document.title = t.titre;
@@ -218,7 +222,7 @@
 
         if (j.programme && j.programme.length) {
           const chips = el("div", "chips");
-          j.programme.forEach(p => chips.append(el("span", "chip", p)));
+          j.programme.forEach(p => chips.append(el("span", "chip", tr(p))));
           card.append(chips);
         }
 
@@ -230,21 +234,20 @@
 
         if (j.notes && j.notes.length) {
           const notes = el("div", "notes");
-          j.notes.forEach(n => notes.append(el("p", null, n)));
+          j.notes.forEach(n => notes.append(el("p", null, tr(n))));
           card.append(notes);
         }
         week.append(card);
       });
     }
 
-    let lang = "fr";
     try { if (T[localStorage.getItem("langue")]) lang = localStorage.getItem("langue"); } catch (e) {}
     document.querySelectorAll(".lang button").forEach(b => b.addEventListener("click", () => {
       lang = b.dataset.lang;
       try { localStorage.setItem("langue", lang); } catch (e) {}
-      render(lang);
+      render();
     }));
-    render(lang);
+    render();
   })();
 </script>
 </body>
